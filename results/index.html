@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CE353 My Marks</title>
+<style>
+  :root{
+    --bg:#f3f5f0; --card:#ffffff; --ink:#1d2a1f; --muted:#5a6a5c; --green:#2f5d2b; --green-d:#244a21;
+    --red:#b3261e; --line:#d5dccf; --ok:#e5f1e3; --err:#fbe9e7; --warn:#fff3cd; --btn-ink:#fff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12180f; --card:#1b2418; --ink:#e8efe5; --muted:#a2b09f; --green:#7fb878; --green-d:#6aa564;
+      --red:#ff8a80; --line:#33432f; --ok:#1f3a1d; --err:#3d1f1c; --warn:#3a3416; --btn-ink:#10200e;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12180f; --card:#1b2418; --ink:#e8efe5; --muted:#a2b09f; --green:#7fb878; --green-d:#6aa564;
+    --red:#ff8a80; --line:#33432f; --ok:#1f3a1d; --err:#3d1f1c; --warn:#3a3416; --btn-ink:#10200e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:620px;margin:0 auto;padding:24px 16px 48px}
+  header{text-align:center;margin-bottom:18px}
+  header .uni{font-size:.8rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  h1{font-size:1.5rem;margin:.2rem 0 .1rem;color:var(--green)}
+  header p{margin:.2rem 0;color:var(--muted);font-size:.95rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+  label{display:block;font-weight:600;margin:14px 0 4px}
+  label:first-of-type{margin-top:0}
+  input{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+  input:focus{outline:2px solid var(--green);outline-offset:1px}
+  .hint{font-size:.85rem;color:var(--muted);margin:4px 0 0}
+  button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;background:var(--green);color:var(--btn-ink);width:100%;margin-top:14px}
+  button:hover{background:var(--green-d)} button:disabled{opacity:.6;cursor:wait}
+  #msg{margin-top:14px;padding:12px;border-radius:10px;display:none;font-size:.95rem}
+  #msg.err{display:block;background:var(--err);color:var(--red)}
+  #out{display:none}
+  .who{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .who b{font-size:1.1rem} .who span{color:var(--muted);font-size:.85rem}
+  .big{font-size:2rem;font-weight:700;color:var(--green);line-height:1.1}
+  .sub{color:var(--muted);font-size:.88rem}
+  h2{font-size:1.05rem;margin:0 0 2px;color:var(--green)}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  td,th{padding:8px 4px;border-top:1px solid var(--line);text-align:left;font-size:.95rem}
+  td.r,th.r{text-align:right;white-space:nowrap}
+  .none{color:var(--red)} .pend{color:var(--muted)} .hold{background:var(--warn);border-radius:6px;padding:2px 6px}
+  .tot td{font-weight:700}
+  .bar{height:8px;background:var(--line);border-radius:6px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--green)}
+  .note{font-size:.85rem;color:var(--muted);margin:6px 0 0}
+  footer{margin-top:18px;text-align:center;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="uni">KNUST &middot; Department of Civil Engineering</div>
+    <h1>CE 353 My Marks</h1>
+    <p>Quizzes, homework, mid-semester, project and examination marks</p>
+  </header>
+
+  <form class="card" id="f" autocomplete="off">
+    <label for="idx">Index number</label>
+    <input id="idx" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 3951234" required>
+    <label for="nm">Your name</label>
+    <input id="nm" placeholder="Surname or any of your names, as on your KNUST record" required>
+    <label for="pin">Your personal PIN</label>
+    <input id="pin" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. K7M2-9QXP (given to you by your lecturer)" required>
+    <p class="hint">Only you can open your marks: you need your index number, your name and your personal PIN. Keep your PIN private. The check happens on your device.</p>
+    <button id="go" type="submit">Show my marks</button>
+    <div id="msg" role="status"></div>
+  </form>
+
+  <div id="out"></div>
+
+  <footer>Marks are updated as they become available. If something looks wrong, tell your lecturer.</footer>
+</div>
+
+<script>
+const SALT = 'CE353-RES-APP-v1';
+const ITER = 150000;
+const enc = new TextEncoder();
+const subtle = (window.crypto && window.crypto.subtle) || null;
+const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+function tokens(name){
+  const set = new Set();
+  for (const part of name.split(/[\s,]+/)) {
+    const p = norm(part); if (p.length >= 3) set.add(p);
+    for (const sub of part.split(/[-'’.]+/)) { const q = norm(sub); if (q.length >= 3) set.add(q); }
+  }
+  return [...set];
+}
+const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+async function fileId(index){ return hex(await subtle.digest('SHA-256', enc.encode(SALT + '|id|' + index))).slice(0, 32); }
+const normPin = s => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+async function slotKey(index, token, pin){
+  const base = await subtle.importKey('raw', enc.encode(index + '|' + token + '|' + pin), 'PBKDF2', false, ['deriveKey']);
+  return subtle.deriveKey({name:'PBKDF2', salt: enc.encode(SALT), iterations: ITER, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+}
+async function decryptDoc(bytes, index, nameInput, pinInput){
+  const pin = normPin(pinInput);
+  const n = bytes[0], slots = []; let off = 1;
+  for (let i = 0; i < n; i++){ slots.push([bytes.slice(off, off + 12), bytes.slice(off + 12, off + 60)]); off += 60; }
+  const iv2 = bytes.slice(off, off + 12), body = bytes.slice(off + 12);
+  for (const t of tokens(nameInput)) {
+    const k = await slotKey(index, t, pin);
+    for (const [iv, wrapped] of slots) {
+      try {
+        const raw = await subtle.decrypt({name:'AES-GCM', iv}, k, wrapped);
+        const ck = await subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+        return JSON.parse(new TextDecoder().decode(await subtle.decrypt({name:'AES-GCM', iv: iv2}, ck, body)));
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = x => (Math.round(x * 10) / 10).toString();
+function cell(it){
+  if (it.status === 'ok') return '<td class="r">' + num(it.score) + ' / ' + num(it.out) + ' <span class="sub">(' + num(it.pct) + '%)</span></td>';
+  if (it.status === 'hold') return '<td class="r"><span class="hold">Under review</span></td>';
+  if (it.status === 'none') return '<td class="r none">No score recorded</td>';
+  return '<td class="r pend">Not yet marked</td>';
+}
+function block(title, weight, list, pct){
+  let rows = list.map(it => '<tr><td>' + esc(it.label) + '</td>' + cell(it) + '</tr>').join('');
+  if (pct !== null && pct !== undefined && list.length > 1) rows += '<tr class="tot"><td>Average of marked</td><td class="r">' + num(pct) + '%</td></tr>';
+  return '<div class="card"><h2>' + esc(title) + '</h2><div class="sub">Counts ' + num(weight) + '% of the final mark</div><table>' + rows + '</table></div>';
+}
+function render(d){
+  const r = d.running, w = d.weights;
+  let h = '<div class="card"><div class="who"><b>' + esc(d.name) + '</b><span>Index ' + d.index + ' &middot; updated ' + esc(d.updated) + '</span></div></div>';
+  if (r.available > 0) {
+    h += '<div class="card"><h2>Course mark so far</h2><div class="big">' + num(r.earned) + ' <span class="sub">out of ' + num(r.available) + ' marks assessed so far</span></div>'
+      + '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, r.pct)) + '%"></i></div>'
+      + '<p class="note">That is ' + num(r.pct) + '% of what has been marked. It is not your final result: the remaining parts are still to come, and attendance is added at the end.</p></div>';
+  } else {
+    h += '<div class="card"><h2>Course mark so far</h2><p class="note">Nothing has been marked for you yet.</p></div>';
+  }
+  h += block('Quizzes', w.quiz, d.quizzes, d.comp.quiz);
+  h += block('Homework', w.hw, d.homework, d.comp.hw);
+  const ex = d.exams || [];
+  if (ex.length === 3) {
+    h += block('Mid-semester examination', w.mid, [ex[0]]);
+    h += block('Project work', w.proj, [ex[1]]);
+    h += block('End-of-semester written examination', w.final, [ex[2]]);
+  }
+  const a = d.attendance;
+  let at = '<div class="card"><h2>Attendance</h2>';
+  if (a.held > 0) {
+    at += '<table><tr><td>Lectures held so far</td><td class="r">' + a.held + '</td></tr><tr><td>You attended</td><td class="r">' + a.present + '</td></tr><tr><td>You missed</td><td class="r">' + a.absent + '</td></tr></table>';
+    if (a.absent > a.max_absent) at += '<p class="note none">You have missed more than ' + a.max_absent + ' lectures. Please see your lecturer.</p>';
+    else at += '<p class="note">Students who attend ' + a.bonus_threshold + ' of the ' + a.planned + ' lectures get a ' + num(a.bonus) + '% bonus; missing more than ' + a.max_absent + ' lectures bars you from the final examination.</p>';
+  } else at += '<p class="note">Attendance has not been recorded yet.</p>';
+  at += '</div>';
+  h += at;
+  $('out').innerHTML = h; $('out').style.display = 'block';
+}
+function show(t){ const m = $('msg'); m.className = t ? 'err' : ''; m.textContent = t || ''; m.style.display = t ? 'block' : 'none'; }
+
+$('f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const index = $('idx').value.replace(/\D/g, ''), name = $('nm').value.trim(), pin = $('pin').value;
+  $('out').style.display = 'none'; show('');
+  if (normPin(pin).length < 8) { show('Enter your personal PIN (8 letters and digits, for example K7M2-9QXP).'); return; }
+  if (!subtle) { show('This link does not support secure opening. Use the https:// address in a current browser.'); return; }
+  if (index.length < 6) { show('Enter your full index number (digits only).'); return; }
+  if (tokens(name).length === 0) { show('Enter your surname or one of your names (at least 3 letters).'); return; }
+  $('go').disabled = true; $('go').textContent = 'Checking...';
+  try {
+    const r = await fetch('data/' + await fileId(index) + '.bin', {cache: 'no-cache'});
+    if (!r.ok) { show('Index number not found. Check the digits. If they are correct, tell your lecturer.'); return; }
+    const d = await decryptDoc(new Uint8Array(await r.arrayBuffer()), index, name, pin);
+    if (!d) { show('Index number, name and PIN do not match. Check each one. For the name, try your surname or another of your names, spelled as on your KNUST record.'); return; }
+    render(d);
+    $('out').scrollIntoView({behavior:'smooth'});
+  } catch (e) { show('Could not load your marks. Check your internet connection and try again.'); }
+  finally { $('go').disabled = false; $('go').textContent = 'Show my marks'; }
+});
+</script>
+</body>
+</html>
