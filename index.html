@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CE353 Homework 2 Sheet</title>
+<style>
+  :root{
+    --bg:#f3f5f0; --card:#ffffff; --ink:#1d2a1f; --muted:#5a6a5c; --green:#2f5d2b; --green-d:#244a21;
+    --red:#b3261e; --line:#d5dccf; --ok:#e5f1e3; --err:#fbe9e7;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12180f; --card:#1b2418; --ink:#e8efe5; --muted:#a2b09f; --green:#7fb878; --green-d:#6aa564;
+      --red:#ff8a80; --line:#33432f; --ok:#1f3a1d; --err:#3d1f1c; --btn-ink:#10200e;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12180f; --card:#1b2418; --ink:#e8efe5; --muted:#a2b09f; --green:#7fb878; --green-d:#6aa564;
+    --red:#ff8a80; --line:#33432f; --ok:#1f3a1d; --err:#3d1f1c; --btn-ink:#10200e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:560px;margin:0 auto;padding:24px 16px 48px}
+  header{text-align:center;margin-bottom:18px}
+  header .uni{font-size:.8rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  h1{font-size:1.5rem;margin:.2rem 0 .1rem;color:var(--green)}
+  header p{margin:.2rem 0;color:var(--muted);font-size:.95rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  label{display:block;font-weight:600;margin:14px 0 4px}
+  label:first-of-type{margin-top:0}
+  input{width:100%;font:inherit;padding:12px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+  input:focus{outline:2px solid var(--green);outline-offset:1px}
+  .hint{font-size:.85rem;color:var(--muted);margin:4px 0 0}
+  button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;background:var(--green);color:var(--btn-ink,#fff)}
+  button:hover{background:var(--green-d)}
+  button:disabled{opacity:.6;cursor:wait}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .row button{flex:1 1 auto}
+  button.secondary{background:transparent;color:var(--green);border:1px solid var(--green)}
+  button.secondary:hover{background:var(--ok)}
+  #msg{margin-top:14px;padding:12px;border-radius:10px;display:none;font-size:.95rem}
+  #msg.err{display:block;background:var(--err);color:var(--red)}
+  #msg.ok{display:block;background:var(--ok)}
+  #result{display:none;margin-top:16px}
+  #result h2{font-size:1.05rem;margin:0 0 6px}
+  #viewer{width:100%;height:70vh;border:1px solid var(--line);border-radius:10px;margin-top:14px;display:none;background:#fff}
+  ul.notes{margin:18px 0 0;padding-left:18px;color:var(--muted);font-size:.9rem}
+  ul.notes li{margin:4px 0}
+  footer{margin-top:22px;text-align:center;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="uni">KNUST &middot; Department of Civil Engineering</div>
+    <h1>CE 353 Homework 2</h1>
+    <p>Get your own personalised question sheet</p>
+  </header>
+
+  <form class="card" id="f" autocomplete="off">
+    <label for="idx">Index number</label>
+    <input id="idx" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 3951234" required>
+    <label for="nm">Your name</label>
+    <input id="nm" placeholder="Surname or any of your names, as on your KNUST record" required>
+    <p class="hint">Your sheet opens only with your index number and your name. Nothing is sent anywhere: the check happens on your device.</p>
+    <div class="row"><button id="go" type="submit">Get my sheet</button></div>
+    <div id="msg" role="status"></div>
+    <div id="result">
+      <h2 id="rtitle">Your sheet is ready</h2>
+      <div class="row">
+        <button type="button" id="open">Open PDF</button>
+        <button type="button" id="dl" class="secondary">Download PDF</button>
+      </div>
+      <iframe id="viewer" title="Your homework sheet"></iframe>
+    </div>
+  </form>
+
+  <ul class="notes">
+    <li>Every sheet has different numbers. Using someone else's numbers gives wrong answers and counts as copying.</li>
+    <li>Do the work by hand and submit it in Microsoft Teams (Assignments), as one PDF named <b>CE353_HW2_&lt;IndexNumber&gt;.pdf</b>.</li>
+    <li>Problem opening your sheet? Check the index number and try your surname, then another of your names. Still stuck? Contact your lecturer.</li>
+  </ul>
+  <footer>CE 353 Reinforced Concrete Design 2026/27</footer>
+</div>
+
+<script>
+const SALT = 'CE353-HW2-APP-v1';
+const ITER = 150000;
+const enc = new TextEncoder();
+const subtle = (window.crypto && window.crypto.subtle) || null;
+
+const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+function tokens(name){
+  const set = new Set();
+  for (const part of name.split(/[\s,]+/)) {
+    const p = norm(part); if (p.length >= 3) set.add(p);
+    for (const sub of part.split(/[-'’.]+/)) { const q = norm(sub); if (q.length >= 3) set.add(q); }
+  }
+  return [...set];
+}
+const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+async function fileId(index){
+  return hex(await subtle.digest('SHA-256', enc.encode(SALT + '|id|' + index))).slice(0, 32);
+}
+async function slotKey(index, token){
+  const base = await subtle.importKey('raw', enc.encode(index + '|' + token), 'PBKDF2', false, ['deriveKey']);
+  return subtle.deriveKey({name:'PBKDF2', salt: enc.encode(SALT), iterations: ITER, hash:'SHA-256'}, base,
+    {name:'AES-GCM', length:256}, false, ['decrypt']);
+}
+// returns an ArrayBuffer with the PDF, or null when index/name do not match
+async function decryptSheet(bytes, index, nameInput){
+  const n = bytes[0];
+  const slots = [];
+  let off = 1;
+  for (let i = 0; i < n; i++){ slots.push([bytes.slice(off, off + 12), bytes.slice(off + 12, off + 60)]); off += 60; }
+  const iv2 = bytes.slice(off, off + 12), body = bytes.slice(off + 12);
+  for (const t of tokens(nameInput)) {
+    const k = await slotKey(index, t);
+    for (const [iv, wrapped] of slots) {
+      try {
+        const raw = await subtle.decrypt({name:'AES-GCM', iv}, k, wrapped);
+        const ck = await subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+        return await subtle.decrypt({name:'AES-GCM', iv: iv2}, ck, body);
+      } catch (e) { /* wrong slot or token */ }
+    }
+  }
+  return null;
+}
+
+const $ = id => document.getElementById(id);
+let blobUrl = null, fileName = '';
+function show(kind, text){ const m = $('msg'); m.className = kind; m.textContent = text; }
+
+$('f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const index = $('idx').value.replace(/\D/g, '');
+  const name = $('nm').value.trim();
+  $('result').style.display = 'none'; $('viewer').style.display = 'none'; show('', ''); $('msg').style.display = 'none';
+  if (!subtle) { show('err', 'This browser or link does not support secure opening. Open the page with https:// in a current browser.'); return; }
+  if (index.length < 6) { show('err', 'Enter your full index number (digits only).'); return; }
+  if (tokens(name).length === 0) { show('err', 'Enter your surname or one of your names (at least 3 letters).'); return; }
+  $('go').disabled = true; $('go').textContent = 'Checking...';
+  try {
+    const r = await fetch('data/' + await fileId(index) + '.bin', {cache: 'no-cache'});
+    if (!r.ok) { show('err', 'Index number not found. Check the digits. If it is correct, contact your lecturer.'); return; }
+    const pdf = await decryptSheet(new Uint8Array(await r.arrayBuffer()), index, name);
+    if (!pdf) { show('err', 'Index number and name do not match. Try your surname, or another of your names, spelled as on your KNUST record.'); return; }
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = URL.createObjectURL(new Blob([pdf], {type: 'application/pdf'}));
+    fileName = 'CE353_HW2_' + index + '.pdf';
+    $('rtitle').textContent = 'Your sheet is ready (index ' + index + ')';
+    $('result').style.display = 'block';
+    show('ok', 'Matched. Download it or open it here, then solve it by hand.');
+  } catch (e) {
+    show('err', 'Could not load the sheet. Check your internet connection and try again.');
+  } finally {
+    $('go').disabled = false; $('go').textContent = 'Get my sheet';
+  }
+});
+$('open').addEventListener('click', () => { const v = $('viewer'); v.src = blobUrl; v.style.display = 'block'; v.scrollIntoView({behavior:'smooth'}); });
+$('dl').addEventListener('click', () => { const a = document.createElement('a'); a.href = blobUrl; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); });
+</script>
+</body>
+</html>
