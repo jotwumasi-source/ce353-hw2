@@ -150,11 +150,13 @@ function render(d){
     h += block('End-of-semester written examination', w.final, [ex[2]]);
   }
   const a = d.attendance;
-  let at = '<div class="card"><h2>Attendance</h2>';
+  let at = '<div class="card"><h2>Attendance</h2><div class="sub">Attendance is the quiz itself: present means you have a quiz mark, absent means a zero</div>';
   if (a.held > 0) {
-    at += '<table><tr><td>Lectures held so far</td><td class="r">' + a.held + '</td></tr><tr><td>You attended</td><td class="r">' + a.present + '</td></tr><tr><td>You missed</td><td class="r">' + a.absent + '</td></tr></table>';
-    if (a.absent > a.max_absent) at += '<p class="note none">You have missed more than ' + a.max_absent + ' lectures. Please see your lecturer.</p>';
-    else at += '<p class="note">Students who attend ' + a.bonus_threshold + ' of the ' + a.planned + ' lectures get a ' + num(a.bonus) + '% bonus; missing more than ' + a.max_absent + ' lectures bars you from the final examination.</p>';
+    const lab = {present: 'Present', absent: 'Absent', pending: 'Not held yet'};
+    at += '<table>' + (a.sessions || []).filter(s => s.status !== 'pending').map(s => '<tr><td>' + esc(s.label) + '</td><td class="r' + (s.status === 'absent' ? ' none' : '') + '">' + lab[s.status] + '</td></tr>').join('')
+        + '<tr class="tot"><td>Attended</td><td class="r">' + a.present + ' of ' + a.held + '</td></tr></table>';
+    if (a.absent > a.max_absent) at += '<p class="note none">You have missed more than ' + a.max_absent + ' attendance' + (a.max_absent === 1 ? '' : 's') + '. Please see your lecturer.</p>';
+    else at += '<p class="note">Out of ' + a.planned + ' planned, attending ' + a.bonus_threshold + ' or more earns a ' + num(a.bonus) + '% bonus. Missing more than ' + a.max_absent + ' bars you from the final examination.</p>';
   } else at += '<p class="note">Attendance has not been recorded yet.</p>';
   at += '</div>';
   h += at;
