@@ -59,7 +59,7 @@
   footer{margin-top:28px;text-align:center;font-size:.8rem;color:var(--muted);line-height:1.5}
   @media (max-width:520px){.wrap{padding:36px 16px 56px} h1{font-size:2.1rem} .card{padding:22px} .big{font-size:2.6rem}}
 </style>
-<meta name="robots" content="noindex"><style>button.alt{background:var(--soft);color:var(--accent);margin-top:12px} button.alt:hover{background:var(--line)} #msg.okmsg{display:block;background:var(--soft);color:var(--ink)} #msg{white-space:pre-wrap}</style></head>
+<meta name="robots" content="noindex"><style>button.alt{background:var(--soft);color:var(--accent);margin-top:12px} button.alt:hover{background:var(--line)} #msg.okmsg{display:block;background:var(--soft);color:var(--ink)} #msg{white-space:pre-wrap} .wrap{max-width:1100px} .tblwrap{overflow:auto;max-height:70vh;margin-top:12px} table.all{font-size:.84rem;margin-top:0} table.all th{cursor:pointer;position:sticky;top:0;background:var(--card);font-weight:600;white-space:nowrap;padding:10px 8px;border-top:0;border-bottom:1px solid var(--line)} table.all td{padding:8px;white-space:nowrap} table.all tbody tr{cursor:pointer} table.all tbody tr:hover td{background:var(--soft)} #q{display:block}</style></head>
 <body>
 <div class="wrap">
   <header>
@@ -70,15 +70,23 @@
   <form class="card" id="af" autocomplete="off">
     <label for="key">Admin key</label>
     <input id="key" type="password" autocomplete="off">
-    <label for="idx">Student index number</label>
+    <button id="all" type="button">Show all students</button>
+    <label for="idx">Or one student: index number</label>
     <input id="idx" inputmode="numeric" placeholder="e.g. 3951234">
-    <button id="view" type="submit">View this student's marks</button>
+    <button id="view" type="submit" class="alt">View this student's marks</button>
     <button id="clear" type="button" class="alt">Clear PIN (forgotten)</button>
     <button id="unlock" type="button" class="alt">Unlock (keep PIN)</button>
     <button id="status" type="button" class="alt">Who is locked?</button>
     <div id="msg" role="status"></div>
     <p class="hint">Nothing is stored in this page. Clear PIN: at the next visit the student types their index number as the PIN, gives their surname and chooses a new 4-digit PIN. Unlock: the PIN stays, the wrong-try count goes back to zero.</p>
   </form>
+  <div class="card" id="allcard" style="display:none">
+    <div class="who"><b id="alltitle">All students</b><span id="allsub"></span></div>
+    <input id="q" placeholder="Search by name or index number" style="margin-top:14px">
+    <button id="csv" type="button" class="alt">Download as CSV</button>
+    <div class="tblwrap"><table class="all" id="alltbl"></table></div>
+    <p class="hint">Click a column heading to sort. Click a student's row to open their page below.</p>
+  </div>
   <div id="out"></div>
 </div>
 <script>
@@ -142,6 +150,60 @@ $('af').addEventListener('submit', async ev => {
   say('Lecturer view: this is what the student sees. PIN ' + (r.pinSet ? 'is set' : 'not set yet') + (r.fails ? ', ' + r.fails + ' wrong tries' : '') + '.', true);
   render(r.data); $('out').style.display = 'block';
 });
+/* ---- all students overview ---- */
+let ALL = [], SORT = {k: 'name', dir: 1};
+function qcols(){
+  const m = new Map();
+  ALL.forEach(s => (s.doc.quizzes || []).forEach((q, i) => { if (q.status === 'ok') m.set(i, q.label); }));
+  return [...m.entries()].sort((a, b) => a[0] - b[0]);
+}
+function pinText(s){ return s.fails >= (s.pinSet ? 5 : 8) ? 'Locked' : (s.pinSet ? 'Set' : 'Not yet'); }
+function rowOf(s, cols){
+  const d = s.doc, a = d.attendance || {}, q = d.quizzes || [];
+  const qv = cols.map(([i]) => (q[i] && q[i].status === 'ok') ? q[i] : null);
+  return {s, idx: String(d.index), name: d.name, campus: d.campus || '', qv,
+    qavg: (d.comp && d.comp.quiz != null) ? Math.round(d.comp.quiz * 10) / 10 : null,
+    present: a.present || 0, absent: a.absent || 0,
+    run: (d.running && d.running.pct != null) ? d.running.pct : null, pin: pinText(s)};
+}
+function drawAll(){
+  const cols = qcols(), term = $('q').value.trim().toLowerCase();
+  let rows = ALL.map(s => rowOf(s, cols)).filter(r => !term || r.name.toLowerCase().includes(term) || r.idx.includes(term));
+  const k = SORT.k, val = r => k.startsWith('q') && k.length > 1 && /^q\d+$/.test(k) ? (r.qv[+k.slice(1)] ? r.qv[+k.slice(1)].pct : -1) : r[k];
+  rows.sort((x, y) => { let a = val(x), b = val(y); if (a === null) a = -1; if (b === null) b = -1; return (a < b ? -1 : a > b ? 1 : 0) * SORT.dir; });
+  const th = (key, label, cls) => '<th data-k="' + key + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + esc(label) + (SORT.k === key ? (SORT.dir > 0 ? ' &#9650;' : ' &#9660;') : '') + '</th>';
+  let h = '<thead><tr>' + th('idx', 'Index') + th('name', 'Name') + th('campus', 'Campus') + cols.map(([i, l], n) => th('q' + n, l, 'r')).join('')
+    + th('qavg', 'Quiz %', 'r') + th('present', 'Present', 'r') + th('absent', 'Absent', 'r') + th('run', 'Course %', 'r') + th('pin', 'PIN') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    h += '<tr data-i="' + r.idx + '"><td>' + r.idx + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.campus) + '</td>'
+      + r.qv.map(q => '<td class="r">' + (q ? num(q.score) + '/' + num(q.out) : '') + '</td>').join('')
+      + '<td class="r">' + (r.qavg === null ? '' : r.qavg) + '</td><td class="r">' + r.present + '</td><td class="r' + (r.absent > 3 ? ' none' : '') + '">' + r.absent + '</td>'
+      + '<td class="r">' + (r.run === null ? '' : r.run) + '</td><td' + (r.pin === 'Locked' ? ' class="none"' : '') + '>' + r.pin + '</td></tr>';
+  });
+  $('alltbl').innerHTML = h + '</tbody>';
+  $('allsub').textContent = rows.length + ' of ' + ALL.length + ' students';
+  $('alltbl').querySelectorAll('th').forEach(t => t.onclick = () => { const kk = t.dataset.k; SORT = {k: kk, dir: SORT.k === kk ? -SORT.dir : 1}; drawAll(); });
+  $('alltbl').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => {
+    const s = ALL.find(x => String(x.doc.index) === tr.dataset.i); if (!s) return;
+    $('idx').value = tr.dataset.i; render(s.doc); $('out').style.display = 'block';
+    say('Lecturer view of ' + s.doc.name + '. PIN: ' + pinText(s) + '.', true); $('out').scrollIntoView({behavior: 'smooth'});
+  });
+}
+$('all').onclick = async () => {
+  $('out').innerHTML = '';
+  const r = await go({action: 'rall'});
+  if (!r.ok) { say(r.msg || 'Failed.'); return; }
+  ALL = r.students; say('', true); $('allcard').style.display = 'block'; drawAll();
+  $('allcard').scrollIntoView({behavior: 'smooth'});
+};
+$('q').addEventListener('input', drawAll);
+$('csv').onclick = () => {
+  const cols = qcols(), rows = ALL.map(s => rowOf(s, cols));
+  const head = ['Index', 'Name', 'Campus'].concat(cols.map(c => c[1]), ['Quiz %', 'Present', 'Absent', 'Course %', 'PIN']);
+  const q = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [head.map(q).join(',')].concat(rows.map(r => [r.idx, r.name, r.campus].concat(r.qv.map(x => x ? x.score + '/' + x.out : ''), [r.qavg, r.present, r.absent, r.run, r.pin]).map(q).join(',')));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv'})); a.download = 'CE353_all_students.csv'; a.click();
+};
 $('clear').onclick = async () => { const r = await go({action: 'rreset', mode: 'clear'}); say(r.ok ? r.note : r.msg, r.ok); };
 $('unlock').onclick = async () => { const r = await go({action: 'rreset', mode: 'unlock'}); say(r.ok ? r.note : r.msg, r.ok); };
 $('status').onclick = async () => { const r = await go({action: 'rstatus'}); say(r.ok ? 'Students loaded: ' + r.students + '. PINs set: ' + r.pinsSet + '. Locked: ' + (r.locked.length ? r.locked.join(', ') : 'none') + '.' : r.msg, r.ok); };
