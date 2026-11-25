@@ -3,48 +3,148 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>CE353 Marks admin</title>
+<title>CE353 lecturer tools</title>
 <style>
-  :root{--bg:#f3f5f0;--card:#fff;--ink:#1d2a1f;--muted:#5a6a5c;--green:#2f5d2b;--line:#d5dccf;--red:#b3261e;--btn:#fff}
-  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12180f;--card:#1b2418;--ink:#e8efe5;--muted:#a2b09f;--green:#7fb878;--line:#33432f;--red:#ff8a80;--btn:#10200e}}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
-  .wrap{max-width:560px;margin:0 auto;padding:24px 16px 48px} h1{font-size:1.3rem;color:var(--green);margin:0 0 4px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
-  label{display:block;font-weight:600;margin:10px 0 4px} input{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
-  button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 14px;margin:10px 8px 0 0;cursor:pointer;background:var(--green);color:var(--btn)}
-  .sub{color:var(--muted);font-size:.9rem} #out{white-space:pre-wrap;margin-top:12px;font-size:.95rem}
+  :root{
+    --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --muted:#6e6e73; --accent:#0071e3; --accent-d:#0077ed; --btn-ink:#ffffff;
+    --line:#d2d2d7; --soft:#e8e8ed; --err:#d70015; --errbg:#fff1f0; --warn:#fff4d6; --warn-ink:#8a5a00;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#000000; --card:#1c1c1e; --ink:#f5f5f7; --muted:#a1a1a6; --accent:#2997ff; --accent-d:#409cff; --btn-ink:#ffffff;
+      --line:#3a3a3c; --soft:#2c2c2e; --err:#ff453a; --errbg:#3a1a18; --warn:#3a2e10; --warn-ink:#ffd60a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#000000; --card:#1c1c1e; --ink:#f5f5f7; --muted:#a1a1a6; --accent:#2997ff; --accent-d:#409cff; --btn-ink:#ffffff;
+    --line:#3a3a3c; --soft:#2c2c2e; --err:#ff453a; --errbg:#3a1a18; --warn:#3a2e10; --warn-ink:#ffd60a;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:56px 20px 72px}
+  header{text-align:center;margin-bottom:32px}
+  header .uni{font-size:.78rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;font-weight:500}
+  h1{font-size:2.6rem;line-height:1.08;font-weight:600;letter-spacing:-.025em;margin:.35rem 0 .5rem;color:var(--ink)}
+  header p{margin:0;color:var(--muted);font-size:1.1rem;letter-spacing:-.01em}
+  .card{background:var(--card);border-radius:20px;padding:28px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  label{display:block;font-weight:600;font-size:.88rem;margin:18px 0 6px;color:var(--ink)}
+  label:first-of-type{margin-top:0}
+  input{width:100%;font:inherit;font-size:1.06rem;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);transition:border-color .15s, box-shadow .15s}
+  input::placeholder{color:#a1a1a6}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent)}
+  .hint{font-size:.85rem;color:var(--muted);margin:12px 0 0;line-height:1.45}
+  button{font:inherit;font-weight:500;font-size:1.06rem;border:0;border-radius:980px;padding:14px 20px;cursor:pointer;background:var(--accent);color:var(--btn-ink);width:100%;margin-top:22px;transition:background .15s, transform .05s}
+  button:hover{background:var(--accent-d)} button:active{transform:scale(.99)} button:disabled{opacity:.5;cursor:wait}
+  #msg,#msg2{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;font-size:.92rem;line-height:1.4}
+  #msg.err,#msg2.err{display:block;background:var(--errbg);color:var(--err)}
+  .who{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .who b{font-size:1.25rem;font-weight:600;letter-spacing:-.015em} .who span{color:var(--muted);font-size:.85rem}
+  .big{font-size:3.2rem;font-weight:600;letter-spacing:-.03em;color:var(--ink);line-height:1.05;margin-top:6px}
+  .big .sub{font-size:1rem;font-weight:400;letter-spacing:0}
+  .sub{color:var(--muted);font-size:.9rem}
+  h2{font-size:1.35rem;font-weight:600;letter-spacing:-.02em;margin:0 0 2px;color:var(--ink)}
+  table{width:100%;border-collapse:collapse;margin-top:14px}
+  td,th{padding:12px 0;border-top:1px solid var(--soft);text-align:left;font-size:1rem}
+  td.r,th.r{text-align:right;white-space:nowrap}
+  .none{color:var(--err)} .pend{color:var(--muted)} .hold{background:var(--warn);color:var(--warn-ink);border-radius:8px;padding:2px 8px;font-size:.9rem}
+  .tot td{font-weight:600}
+  .bar{height:6px;background:var(--soft);border-radius:6px;margin-top:14px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent);border-radius:6px}
+  .note{font-size:.88rem;color:var(--muted);margin:10px 0 0;line-height:1.45}
+  .note a{color:var(--accent);text-decoration:none} .note a:hover{text-decoration:underline}
+  h2 + .sub{margin-bottom:2px}
+  footer{margin-top:28px;text-align:center;font-size:.8rem;color:var(--muted);line-height:1.5}
+  @media (max-width:520px){.wrap{padding:36px 16px 56px} h1{font-size:2.1rem} .card{padding:22px} .big{font-size:2.6rem}}
 </style>
-</head>
+<meta name="robots" content="noindex"><style>button.alt{background:var(--soft);color:var(--accent);margin-top:12px} button.alt:hover{background:var(--line)} #msg.okmsg{display:block;background:var(--soft);color:var(--ink)} #msg{white-space:pre-wrap}</style></head>
 <body>
 <div class="wrap">
-  <h1>CE 353 marks: lecturer tools</h1>
-  <p class="sub">Reset a student's PIN. Only you can do this, with your admin key. Nothing is stored in this page.</p>
-  <div class="card">
+  <header>
+    <div class="uni">KNUST &middot; Department of Civil Engineering</div>
+    <h1>Lecturer tools</h1>
+    <p>CE 353 marks: view a student's page and reset PINs</p>
+  </header>
+  <form class="card" id="af" autocomplete="off">
     <label for="key">Admin key</label>
     <input id="key" type="password" autocomplete="off">
     <label for="idx">Student index number</label>
     <input id="idx" inputmode="numeric" placeholder="e.g. 3951234">
-    <button id="clear">Clear PIN (forgotten)</button>
-    <button id="unlock">Unlock (keep PIN)</button>
-    <button id="status">Who is locked?</button>
-    <div id="out"></div>
-  </div>
-  <p class="sub">Clear PIN: at the next visit the student types their index number as the PIN, gives their surname and chooses a new 4-digit PIN. Unlock: the PIN stays, the wrong-try count goes back to zero.</p>
+    <button id="view" type="submit">View this student's marks</button>
+    <button id="clear" type="button" class="alt">Clear PIN (forgotten)</button>
+    <button id="unlock" type="button" class="alt">Unlock (keep PIN)</button>
+    <button id="status" type="button" class="alt">Who is locked?</button>
+    <div id="msg" role="status"></div>
+    <p class="hint">Nothing is stored in this page. Clear PIN: at the next visit the student types their index number as the PIN, gives their surname and chooses a new 4-digit PIN. Unlock: the PIN stays, the wrong-try count goes back to zero.</p>
+  </form>
+  <div id="out"></div>
 </div>
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbz5eDIWKgR1cKuTKzKCu_HIky4g_hIT6c_civEEX-jo-yvkA9Ho2xFjTNP9-WIIoesV/exec';
 const $ = id => document.getElementById(id);
-async function go(body){
-  $('out').textContent = 'Working...';
-  try {
-    const r = await (await fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({key: $('key').value}, body))})).json();
-    $('out').textContent = r.ok ? (r.note || '') + (r.students !== undefined ? 'Students loaded: ' + r.students + '\nPINs set: ' + r.pinsSet + '\nLocked: ' + (r.locked.length ? r.locked.join(', ') : 'none') : '') : (r.msg || 'Failed.');
-  } catch (e) { $('out').textContent = 'Could not reach the service.'; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = x => (Math.round(x * 10) / 10).toString();
+function cell(it){
+  if (it.status === 'ok') return '<td class="r">' + num(it.score) + ' / ' + num(it.out) + ' <span class="sub">(' + num(it.pct) + '%)</span></td>';
+  if (it.status === 'hold') return '<td class="r"><span class="hold">Under review</span></td>';
+  if (it.status === 'none') return '<td class="r none">No score recorded</td>';
+  return '<td class="r pend">Not yet marked</td>';
 }
-$('clear').onclick = () => go({action: 'rreset', idx: $('idx').value, mode: 'clear'});
-$('unlock').onclick = () => go({action: 'rreset', idx: $('idx').value, mode: 'unlock'});
-$('status').onclick = () => go({action: 'rstatus'});
+function block(title, weight, list, pct){
+  let rows = list.map(it => '<tr><td>' + esc(it.label) + '</td>' + cell(it) + '</tr>').join('');
+  if (pct !== null && pct !== undefined && list.length > 1) rows += '<tr class="tot"><td>Average of marked</td><td class="r">' + num(pct) + '%</td></tr>';
+  return '<div class="card"><h2>' + esc(title) + '</h2><div class="sub">Counts ' + num(weight) + '% of the final mark</div><table>' + rows + '</table></div>';
+}
+function render(d){
+  const r = d.running, w = d.weights;
+  let h = '<div class="card"><div class="who"><b>' + esc(d.name) + '</b><span>Index ' + d.index + ' &middot; updated ' + esc(d.updated) + '</span></div></div>';
+  if (r.available > 0) {
+    h += '<div class="card"><h2>Course mark so far</h2><div class="big">' + num(r.earned) + ' <span class="sub">out of ' + num(r.available) + ' marks assessed so far</span></div>'
+      + '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, r.pct)) + '%"></i></div>'
+      + '<p class="note">That is ' + num(r.pct) + '% of what has been marked. It is not your final result: the remaining parts are still to come, and attendance is added at the end.</p></div>';
+  } else {
+    h += '<div class="card"><h2>Course mark so far</h2><p class="note">Nothing has been marked for you yet.</p></div>';
+  }
+  h += block('Quizzes', w.quiz, d.quizzes, d.comp.quiz);
+  h += block('Homework', w.hw, d.homework, d.comp.hw);
+  const ex = d.exams || [];
+  if (ex.length >= 2) {
+    h += block('Mid-semester examination', w.mid, [ex[0]]);
+    h += block('Project work', w.proj, [ex[1]]);
+  }
+  const a = d.attendance;
+  let at = '<div class="card"><h2>Attendance</h2><div class="sub">Attendance is the quiz itself: present means you have a quiz mark, absent means a zero</div>';
+  if (a.held > 0) {
+    const lab = {present: 'Present', absent: 'Absent', pending: 'Not held yet'};
+    at += '<table>' + (a.sessions || []).filter(s => s.status !== 'pending').map(s => '<tr><td>' + esc(s.label) + '</td><td class="r' + (s.status === 'absent' ? ' none' : '') + '">' + lab[s.status] + '</td></tr>').join('')
+        + '<tr class="tot"><td>Attended</td><td class="r">' + a.present + ' of ' + a.held + '</td></tr></table>';
+    if (a.absent > a.max_absent) at += '<p class="note none">You have missed more than ' + a.max_absent + ' attendance' + (a.max_absent === 1 ? '' : 's') + '. Please see your lecturer.</p>';
+    else at += '<p class="note">Out of ' + a.planned + ' planned, attending ' + a.bonus_threshold + ' or more earns a ' + num(a.bonus) + '% bonus. Missing more than ' + a.max_absent + ' bars you from the final examination.</p>';
+  } else at += '<p class="note">Attendance has not been recorded yet.</p>';
+  at += '</div>';
+  h += at;
+  $('out').innerHTML = h;
+}
+
+function say(t, ok){ const m = $('msg'); m.className = t ? (ok ? 'okmsg' : 'err') : ''; m.textContent = t || ''; m.style.display = t ? 'block' : 'none'; }
+async function go(body){
+  say('Working...', true);
+  try {
+    return await (await fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({key: $('key').value, idx: $('idx').value.replace(/\D/g, '')}, body))})).json();
+  } catch (e) { return {ok: false, msg: 'Could not reach the service.'}; }
+}
+$('af').addEventListener('submit', async ev => {
+  ev.preventDefault(); $('out').innerHTML = '';
+  const r = await go({action: 'rview'});
+  if (!r.ok) { say(r.msg || 'Failed.'); return; }
+  say('Lecturer view: this is what the student sees. PIN ' + (r.pinSet ? 'is set' : 'not set yet') + (r.fails ? ', ' + r.fails + ' wrong tries' : '') + '.', true);
+  render(r.data); $('out').style.display = 'block';
+});
+$('clear').onclick = async () => { const r = await go({action: 'rreset', mode: 'clear'}); say(r.ok ? r.note : r.msg, r.ok); };
+$('unlock').onclick = async () => { const r = await go({action: 'rreset', mode: 'unlock'}); say(r.ok ? r.note : r.msg, r.ok); };
+$('status').onclick = async () => { const r = await go({action: 'rstatus'}); say(r.ok ? 'Students loaded: ' + r.students + '. PINs set: ' + r.pinsSet + '. Locked: ' + (r.locked.length ? r.locked.join(', ') : 'none') + '.' : r.msg, r.ok); };
 </script>
 </body>
 </html>
