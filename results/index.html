@@ -58,7 +58,7 @@
   <header>
     <div class="uni">KNUST &middot; Department of Civil Engineering</div>
     <h1>CE 353 My Marks</h1>
-    <p>Quizzes, homework, mid-semester, project and examination marks</p>
+    <p>Quizzes, homework, attendance, mid-semester and project marks</p>
   </header>
 
   <form class="card" id="f" autocomplete="off">
@@ -144,10 +144,9 @@ function render(d){
   h += block('Quizzes', w.quiz, d.quizzes, d.comp.quiz);
   h += block('Homework', w.hw, d.homework, d.comp.hw);
   const ex = d.exams || [];
-  if (ex.length === 3) {
+  if (ex.length >= 2) {
     h += block('Mid-semester examination', w.mid, [ex[0]]);
     h += block('Project work', w.proj, [ex[1]]);
-    h += block('End-of-semester written examination', w.final, [ex[2]]);
   }
   const a = d.attendance;
   let at = '<div class="card"><h2>Attendance</h2><div class="sub">Attendance is the quiz itself: present means you have a quiz mark, absent means a zero</div>';
