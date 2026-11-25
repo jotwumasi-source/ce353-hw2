@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CE353 Marks admin</title>
+<style>
+  :root{--bg:#f3f5f0;--card:#fff;--ink:#1d2a1f;--muted:#5a6a5c;--green:#2f5d2b;--line:#d5dccf;--red:#b3261e;--btn:#fff}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12180f;--card:#1b2418;--ink:#e8efe5;--muted:#a2b09f;--green:#7fb878;--line:#33432f;--red:#ff8a80;--btn:#10200e}}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:560px;margin:0 auto;padding:24px 16px 48px} h1{font-size:1.3rem;color:var(--green);margin:0 0 4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+  label{display:block;font-weight:600;margin:10px 0 4px} input{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+  button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 14px;margin:10px 8px 0 0;cursor:pointer;background:var(--green);color:var(--btn)}
+  .sub{color:var(--muted);font-size:.9rem} #out{white-space:pre-wrap;margin-top:12px;font-size:.95rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CE 353 marks: lecturer tools</h1>
+  <p class="sub">Reset a student's PIN. Only you can do this, with your admin key. Nothing is stored in this page.</p>
+  <div class="card">
+    <label for="key">Admin key</label>
+    <input id="key" type="password" autocomplete="off">
+    <label for="idx">Student index number</label>
+    <input id="idx" inputmode="numeric" placeholder="e.g. 3951234">
+    <button id="clear">Clear PIN (forgotten)</button>
+    <button id="unlock">Unlock (keep PIN)</button>
+    <button id="status">Who is locked?</button>
+    <div id="out"></div>
+  </div>
+  <p class="sub">Clear PIN: at the next visit the student types their index number as the PIN, gives their surname and chooses a new 4-digit PIN. Unlock: the PIN stays, the wrong-try count goes back to zero.</p>
+</div>
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbz5eDIWKgR1cKuTKzKCu_HIky4g_hIT6c_civEEX-jo-yvkA9Ho2xFjTNP9-WIIoesV/exec';
+const $ = id => document.getElementById(id);
+async function go(body){
+  $('out').textContent = 'Working...';
+  try {
+    const r = await (await fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({key: $('key').value}, body))})).json();
+    $('out').textContent = r.ok ? (r.note || '') + (r.students !== undefined ? 'Students loaded: ' + r.students + '\nPINs set: ' + r.pinsSet + '\nLocked: ' + (r.locked.length ? r.locked.join(', ') : 'none') : '') : (r.msg || 'Failed.');
+  } catch (e) { $('out').textContent = 'Could not reach the service.'; }
+}
+$('clear').onclick = () => go({action: 'rreset', idx: $('idx').value, mode: 'clear'});
+$('unlock').onclick = () => go({action: 'rreset', idx: $('idx').value, mode: 'unlock'});
+$('status').onclick = () => go({action: 'rstatus'});
+</script>
+</body>
+</html>

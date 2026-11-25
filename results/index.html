@@ -64,59 +64,36 @@
   <form class="card" id="f" autocomplete="off">
     <label for="idx">Index number</label>
     <input id="idx" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 3951234" required>
-    <label for="nm">Your name</label>
-    <input id="nm" placeholder="Surname or any of your names, as on your KNUST record" required>
-    <label for="pin">Your personal PIN</label>
-    <input id="pin" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. K7M2-9QXP (given to you by your lecturer)" required>
-    <p class="hint">Only you can open your marks: you need your index number, your name and your personal PIN. Keep your PIN private. The check happens on your device.</p>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="Your 4-digit PIN" required>
+    <p class="hint">First time here? Type your index number again in the PIN box. You will then choose your own 4-digit PIN. Keep it private.</p>
     <button id="go" type="submit">Show my marks</button>
     <div id="msg" role="status"></div>
   </form>
 
-  <div id="out"></div>
+  <form class="card" id="setup" autocomplete="off" style="display:none">
+    <h2 id="setup-title">Choose your PIN</h2>
+    <p class="sub" id="setup-sub"></p>
+    <div id="sn-wrap"><label for="sn">Your surname</label>
+    <input id="sn" placeholder="Surname, as on your KNUST record" autocomplete="off"></div>
+    <div id="cur-wrap" style="display:none"><label for="cur">Current PIN</label>
+    <input id="cur" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <label for="np">New PIN (4 digits)</label>
+    <input id="np" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" required>
+    <label for="np2">Type the new PIN again</label>
+    <input id="np2" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" required>
+    <button id="save" type="submit">Save PIN and show my marks</button>
+    <div id="msg2" role="status"></div>
+  </form>
 
-  <footer>Marks are updated as they become available. If something looks wrong, tell your lecturer.</footer>
+  <div id="out" style="display:none"></div>
+  <p class="note" id="chg" style="display:none;text-align:center"><a href="#" id="chg-link">Change my PIN</a> &middot; <a href="#" id="out-link">Sign out</a></p>
+
+  <footer>Marks are updated as they become available. If something looks wrong, or you forget your PIN, tell your lecturer.</footer>
 </div>
 
 <script>
-const SALT = 'CE353-RES-APP-v1';
-const ITER = 150000;
-const enc = new TextEncoder();
-const subtle = (window.crypto && window.crypto.subtle) || null;
-const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
-function tokens(name){
-  const set = new Set();
-  for (const part of name.split(/[\s,]+/)) {
-    const p = norm(part); if (p.length >= 3) set.add(p);
-    for (const sub of part.split(/[-'’.]+/)) { const q = norm(sub); if (q.length >= 3) set.add(q); }
-  }
-  return [...set];
-}
-const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-async function fileId(index){ return hex(await subtle.digest('SHA-256', enc.encode(SALT + '|id|' + index))).slice(0, 32); }
-const normPin = s => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
-async function slotKey(index, token, pin){
-  const base = await subtle.importKey('raw', enc.encode(index + '|' + token + '|' + pin), 'PBKDF2', false, ['deriveKey']);
-  return subtle.deriveKey({name:'PBKDF2', salt: enc.encode(SALT), iterations: ITER, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
-}
-async function decryptDoc(bytes, index, nameInput, pinInput){
-  const pin = normPin(pinInput);
-  const n = bytes[0], slots = []; let off = 1;
-  for (let i = 0; i < n; i++){ slots.push([bytes.slice(off, off + 12), bytes.slice(off + 12, off + 60)]); off += 60; }
-  const iv2 = bytes.slice(off, off + 12), body = bytes.slice(off + 12);
-  for (const t of tokens(nameInput)) {
-    const k = await slotKey(index, t, pin);
-    for (const [iv, wrapped] of slots) {
-      try {
-        const raw = await subtle.decrypt({name:'AES-GCM', iv}, k, wrapped);
-        const ck = await subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
-        return JSON.parse(new TextDecoder().decode(await subtle.decrypt({name:'AES-GCM', iv: iv2}, ck, body)));
-      } catch (e) {}
-    }
-  }
-  return null;
-}
-
+const API = 'https://script.google.com/macros/s/AKfycbz5eDIWKgR1cKuTKzKCu_HIky4g_hIT6c_civEEX-jo-yvkA9Ho2xFjTNP9-WIIoesV/exec';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num = x => (Math.round(x * 10) / 10).toString();
@@ -159,29 +136,67 @@ function render(d){
   } else at += '<p class="note">Attendance has not been recorded yet.</p>';
   at += '</div>';
   h += at;
-  $('out').innerHTML = h; $('out').style.display = 'block';
+  $('out').innerHTML = h;
 }
-function show(t){ const m = $('msg'); m.className = t ? 'err' : ''; m.textContent = t || ''; m.style.display = t ? 'block' : 'none'; }
 
+let S = {idx: '', pin: ''};            // kept in memory only, never stored
+function show(el, t){ const m = $(el); m.className = t ? 'err' : ''; m.textContent = t || ''; m.style.display = t ? 'block' : 'none'; }
+async function api(body){
+  const r = await fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)});
+  return r.json();
+}
+function view(which){                  // login | setup | marks
+  $('f').style.display = which === 'login' ? 'block' : 'none';
+  $('setup').style.display = which === 'setup' ? 'block' : 'none';
+  $('out').style.display = which === 'marks' ? 'block' : 'none';
+  $('chg').style.display = which === 'marks' ? 'block' : 'none';
+}
+function startSetup(first){
+  $('sn-wrap').style.display = first ? 'block' : 'none';
+  $('cur-wrap').style.display = first ? 'none' : 'block';
+  $('setup-title').textContent = first ? 'Choose your PIN' : 'Change your PIN';
+  $('setup-sub').textContent = first ? 'This is your first visit. Confirm it is you, then choose a 4-digit PIN to use from now on.' : 'Enter your current PIN, then choose a new 4-digit PIN.';
+  $('save').textContent = first ? 'Save PIN and show my marks' : 'Save new PIN';
+  ['sn', 'cur', 'np', 'np2'].forEach(i => $(i).value = ''); show('msg2', '');
+  view('setup');
+}
 $('f').addEventListener('submit', async ev => {
   ev.preventDefault();
-  const index = $('idx').value.replace(/\D/g, ''), name = $('nm').value.trim(), pin = $('pin').value;
-  $('out').style.display = 'none'; show('');
-  if (normPin(pin).length < 8) { show('Enter your personal PIN (8 letters and digits, for example K7M2-9QXP).'); return; }
-  if (!subtle) { show('This link does not support secure opening. Use the https:// address in a current browser.'); return; }
-  if (index.length < 6) { show('Enter your full index number (digits only).'); return; }
-  if (tokens(name).length === 0) { show('Enter your surname or one of your names (at least 3 letters).'); return; }
+  const idx = $('idx').value.replace(/\D/g, ''), pin = $('pin').value.replace(/\D/g, '');
+  show('msg', '');
+  if (idx.length < 6) { show('msg', 'Enter your full index number (digits only).'); return; }
+  if (!pin) { show('msg', 'Enter your PIN. First time? Type your index number again.'); return; }
   $('go').disabled = true; $('go').textContent = 'Checking...';
   try {
-    const r = await fetch('data/' + await fileId(index) + '.bin', {cache: 'no-cache'});
-    if (!r.ok) { show('Index number not found. Check the digits. If they are correct, tell your lecturer.'); return; }
-    const d = await decryptDoc(new Uint8Array(await r.arrayBuffer()), index, name, pin);
-    if (!d) { show('Index number, name and PIN do not match. Check each one. For the name, try your surname or another of your names, spelled as on your KNUST record.'); return; }
-    render(d);
-    $('out').scrollIntoView({behavior:'smooth'});
-  } catch (e) { show('Could not load your marks. Check your internet connection and try again.'); }
+    const r = await api({action: 'rlogin', idx, pin});
+    if (!r.ok) { show('msg', r.msg || 'Could not sign in.'); return; }
+    S = {idx, pin};
+    if (r.first) { startSetup(true); return; }
+    $('pin').value = ''; render(r.data); view('marks'); window.scrollTo(0, 0);
+  } catch (e) { show('msg', 'Could not reach the marks service. Check your internet connection and try again.'); }
   finally { $('go').disabled = false; $('go').textContent = 'Show my marks'; }
 });
+$('setup').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const first = $('sn-wrap').style.display !== 'none';
+  const np = $('np').value.replace(/\D/g, ''), np2 = $('np2').value.replace(/\D/g, '');
+  if (np.length !== 4) { show('msg2', 'Choose a PIN of exactly 4 digits.'); return; }
+  if (np !== np2) { show('msg2', 'The two PINs do not match.'); return; }
+  const body = {action: 'rsetpin', idx: S.idx, np, cur: first ? S.idx : $('cur').value.replace(/\D/g, '')};
+  if (first) {
+    body.surname = $('sn').value;
+    if (body.surname.replace(/[^A-Za-z]/g, '').length < 3) { show('msg2', 'Enter your surname (at least 3 letters).'); return; }
+  }
+  $('save').disabled = true;
+  try {
+    const r = await api(body);
+    if (!r.ok) { show('msg2', r.msg || 'Could not save the PIN.'); return; }
+    S = {idx: S.idx, pin: np}; $('pin').value = ''; render(r.data); view('marks'); window.scrollTo(0, 0); show('msg', '');
+  } catch (e) { show('msg2', 'Could not reach the marks service. Check your internet connection and try again.'); }
+  finally { $('save').disabled = false; }
+});
+$('chg-link').addEventListener('click', ev => { ev.preventDefault(); startSetup(false); });
+$('out-link').addEventListener('click', ev => { ev.preventDefault(); S = {idx: '', pin: ''}; $('out').innerHTML = ''; $('idx').value = ''; $('pin').value = ''; view('login'); });
 </script>
 </body>
 </html>
