@@ -145,6 +145,7 @@ async function go(body){
 }
 $('af').addEventListener('submit', async ev => {
   ev.preventDefault(); $('out').innerHTML = '';
+  if (!$('idx').value.replace(/\D/g, '')) { $('all').onclick(); return; }   // Enter with no index number = show everyone
   const r = await go({action: 'rview'});
   if (!r.ok) { say(r.msg || 'Failed.'); return; }
   say('Lecturer view: this is what the student sees. PIN ' + (r.pinSet ? 'is set' : 'not set yet') + (r.fails ? ', ' + r.fails + ' wrong tries' : '') + '.', true);
